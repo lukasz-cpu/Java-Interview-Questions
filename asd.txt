@@ -1,0 +1,86 @@
+package dev.morling.onebrc;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+
+public class CalculateAverage_luk_pop {
+
+    static class Stats {
+        double min = Double.MAX_VALUE;
+        double max = Double.MIN_VALUE;
+        double sum = 0;
+        long count = 0;
+
+        synchronized void add(double value) {
+            if (value < min) min = value;
+            if (value > max) max = value;
+            sum += value;
+            count++;
+        }
+
+        String formatted() {
+            double mean = count > 0 ? sum / count : Double.NaN;
+            return String.format("%.1f/%.1f/%.1f", min, mean, max);
+        }
+    }
+
+    public static void main(String[] args) throws IOException, InterruptedException {
+        String inputFile = "measurements.txt";
+        String outputFile = "wyniki.txt";
+        int numThreads = Runtime.getRuntime().availableProcessors();
+
+        BlockingQueue<String> queue = new ArrayBlockingQueue<>(10_000); // kolejka dla linii
+        ConcurrentHashMap<String, Stats> map = new ConcurrentHashMap<>();
+
+        ExecutorService workers = Executors.newFixedThreadPool(numThreads);
+        for (int i = 0; i < numThreads; i++) {
+            workers.submit(() -> {
+                try {
+                    while (true) {
+                        String line = queue.poll(1, TimeUnit.SECONDS);
+                        if (line == null) break; // brak linii po 1s = koniec
+                        if (line.isBlank()) continue;
+                        String[] parts = line.split(";");
+                        if (parts.length != 2) continue;
+                        String station = parts[0];
+                        double value = Double.parseDouble(parts[1]);
+
+                        map.computeIfAbsent(station, k -> new Stats()).add(value);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        }
+
+        // Główny wątek czyta plik i wrzuca linie do kolejki
+        try (BufferedReader br = new BufferedReader(new FileReader(inputFile))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                queue.put(line); // blokuje jeśli kolejka pełna
+            }
+        }
+
+        workers.shutdown();
+        workers.awaitTermination(1, TimeUnit.HOURS); // czekamy na zakończenie wątków
+
+        try (PrintWriter out = new PrintWriter(outputFile)) {
+            map.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(entry -> out.println(entry.getKey() + "=" + entry.getValue().formatted()));
+        }
+
+        System.out.println("Wyniki zapisano do " + outputFile);
+    }
+}
+
