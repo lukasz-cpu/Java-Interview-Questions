@@ -964,3 +964,5 @@ na mid/senior miałem tak:
 53. czy da się apkę zdebugować na produkcji
 54. SOLID -> liskov
 55. phantom reads
+56. Nowości w Javie 25
+    https://pvs-studio.com/en/blog/posts/java/1284/
