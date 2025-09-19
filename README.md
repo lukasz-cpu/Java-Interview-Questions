@@ -966,3 +966,38 @@ na mid/senior miałem tak:
 55. phantom reads
 56. Nowości w Javie 25
     https://pvs-studio.com/en/blog/posts/java/1284/
+    Jak sprawdzić czy kandydat na mida/seniora ogarnia? Zadaj mu te kilka prostych pytań, idealne pod rozmowe o prace
+
+1. EXPLAIN - JOIN vs Subquery - wyjaśnij dlaczego niezalecane jest używanie subquery (WHERE id IN (SELECT …))
+
+Odpowiedź:
+
+EXPLAIN pokazuje, jak PostgreSQL łączy tabele: nested loop, hash join, merge join. Czasami prosty subquery (WHERE id IN (SELECT …)) wydaje się łatwiejszy, ale planner może wykonać sekwencyjny skan lub nieoptymalny nested loop zamiast hash join, co jest wolniejsze na dużych tabelach. Senior powinien wiedzieć, że często przepisanie subquery na JOIN może radykalnie poprawić plan wykonania.
+
+
+2. CTE – Common Table Expressions i materialization - jak zmienił się w postgresie <12 i >=12? Na co należy uważać by zapytania były wydajne?
+
+Odpowiedź:
+
+CTE w PostgreSQL do wersji 12 zawsze materializowały dane: planner tworzył tymczasową tabelę z wynikami CTE, niezależnie od tego, czy było to optymalne. Od PostgreSQL 12 można użyć inline CTE (bez wymuszonej materializacji) dla optymalizacji. Duże CTE mogą znacznie spowolnić zapytanie, jeśli planner nie może optymalnie włączyć ich w plan główny.
+
+
+3. LIMIT i ORDER BY - czy używanie tych klauzul w tabeli wpływa na zaplanowanie wyboru indeksu?
+
+Odpowiedź:
+
+LIMIT może zmienić wybór indeksu. Przykład: jeśli chcesz ORDER BY kolumna DESC LIMIT 10, planner może użyć indeksu B-tree odwrotnego sortowania lub full scan + sort. Na dużych tabelach brak odpowiedniego indeksu sortującego może spowodować kosztowny sort zamiast szybkiego index scan.
+
+
+4. VACUUM - jak wpływa na wydajność query?
+
+Odpowiedź:
+
+PostgreSQL używa statystyk do szacowania kosztów. Brak regularnego VACUUM może sprawić, że planner wybierze sekwencyjne skanowanie zamiast indeksu lub hash join. Senior powinien wiedzieć, że nie tylko ANALYZE, ale też fragmentacja danych (dead tuples) wpływa na plany.
+
+
+5. Jak stuningowałbyś parametry planera w zależności od hardware na którym działa postgreSQL by indeksy były poprawie używane?
+
+Odpowiedź:
+
+randompagecost, seqpagecost, cputuplecost, effectivecachesize mają bezpośredni wpływ na wybór planu. Domyślne wartości mogą być optymalne dla SSD lub RAM, ale nie dla dużego HDD. Senior powinien wiedzieć, że tuning tych parametrów często poprawia użycie indeksów.
