@@ -1,0 +1,123 @@
+🛠 Możliwe rozwiązania
+1️⃣ Centralny rejestr punktów opisowych (Registry Service)
+
+Najczystsze i najbezpieczniejsze podejście.
+
+➡️ Wprowadzasz dodatkowy mikroserwis, np. product-descriptor-registry, który:
+
+przechowuje wszystkie unikalne klucze punktów opisowych (key, label, category),
+
+wystawia API do ich rejestracji i walidacji.
+
+🔧 Zasada działania:
+
+Kiedy mikroserwis (np. credit-card) chce dodać nowy punkt opisowy:
+
+wysyła żądanie do product-descriptor-registry:
+POST /api/v1/descriptors/validate
+
+Registry sprawdza, czy key już istnieje globalnie.
+
+Jeśli tak – zwraca błąd 409 Conflict.
+
+Jeśli nie – rejestruje nowy key i zwraca 201 Created.
+
+✅ Zalety:
+
+Globalna spójność i unikalność.
+
+Niezależność logiki biznesowej mikroserwisów.
+
+Centralne miejsce do zarządzania metadanymi (można rozbudować o kategorie, wersjonowanie, tłumaczenia itp.).
+
+❌ Wady:
+
+Wprowadza zależność między mikroserwisami (muszą wołać registry API).
+
+Minimalnie obniża autonomię (ale często akceptowalne w praktyce).
+
+2️⃣ Walidacja w warstwie CI/CD (np. przy deployu lub commit hooku)
+
+Można też walidować statycznie – np. przy deployu lub pushu do repo.
+
+🔧 Jak to działa:
+
+Każdy mikroserwis trzyma swoje definicje punktów opisowych (np. w JSON, YAML).
+
+Pipeline CI/CD ma krok walidujący:
+
+pobiera definicje z innych mikroserwisów (np. z repo Git),
+
+sprawdza duplikaty key między nimi.
+
+✅ Zalety:
+
+Brak runtime zależności między mikroserwisami.
+
+Prosta implementacja.
+
+❌ Wady:
+
+Nie działa „na żywo” — wykrywa dopiero przy deployu.
+
+Nie sprawdzi unikalności w danych runtime (jeśli ktoś doda rekord z API bez deployu).
+
+3️⃣ Event-driven walidacja (z wykorzystaniem brokera, np. Kafka, RabbitMQ)
+
+Każdy mikroserwis po dodaniu nowego punktu opisowego publikuje event:
+
+{
+  "event": "DESCRIPTION_POINT_CREATED",
+  "key": "interest_rate",
+  "source": "credit-card"
+}
+
+
+Inny serwis (np. descriptor-validator) subskrybuje te eventy i:
+
+utrzymuje w swojej bazie listę istniejących key,
+
+wykrywa kolizje (np. wysyła alert, zapisuje konflikt).
+
+✅ Zalety:
+
+Asynchroniczne, skalowalne, elastyczne.
+
+Mikroserwisy pozostają niezależne.
+
+❌ Wady:
+
+Brak gwarancji natychmiastowej walidacji.
+
+Bardziej złożona infrastruktura.
+
+4️⃣ Walidacja okresowa (batch / scheduled job)
+
+Można też ustawić cykliczny proces (cron), który:
+
+pobiera dane z wszystkich mikroserwisów przez ich API,
+
+agreguje listę key,
+
+wykrywa duplikaty i raportuje błędy.
+
+✅ Zalety:
+
+Nie wymaga modyfikacji mikroserwisów.
+
+Prosta implementacja na początek.
+
+❌ Wady:
+
+Walidacja nie jest natychmiastowa.
+
+Nie zapobiega błędom w momencie ich wprowadzenia.
+
+💡 Rekomendacja
+
+Jeśli projekt jest aktywnie rozwijany i planujesz dalszy rozrost produktów:
+
+🔹 Wprowadź centralny mikroserwis „registry” dla kluczy punktów opisowych (podejście nr 1).
+🔹 W połączeniu z walidacją w CI/CD (podejście nr 2) — masz gwarancję spójności zarówno w runtime, jak i w procesie wdrażania.
+
+Chcesz, żebym pokazał Ci przykładowy schemat architektury + fragment API registry, który zapewnia taką walidację (np. OpenAPI + diagram przepływu)?
